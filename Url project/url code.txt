@@ -1,0 +1,179 @@
+import pyshorteners
+import tkinter as tk
+from tkinter import ttk, messagebox
+import pyperclip
+import webbrowser
+import json
+import os
+from datetime import datetime
+
+class URLShortener:
+    def __init__(self):
+        self.window = tk.Tk()
+        self.window.title("URL Shortener")
+        self.window.geometry("600x400")
+        self.window.configure(bg="#f0f0f0")
+        
+        # Initialize shortener
+        self.shortener = pyshorteners.Shortener()
+        
+        # Load history
+        self.history_file = "url_history.json"
+        self.history = self.load_history()
+        
+        self.create_gui()
+        
+    def load_history(self):
+        """Load URL shortening history from file"""
+        if os.path.exists(self.history_file):
+            try:
+                with open(self.history_file, 'r') as f:
+                    return json.load(f)
+            except:
+                return []
+        return []
+    
+    def save_history(self):
+        """Save URL shortening history to file"""
+        with open(self.history_file, 'w') as f:
+            json.dump(self.history, f)
+    
+    def create_gui(self):
+        """Create the graphical user interface"""
+        # Main frame
+        main_frame = ttk.Frame(self.window, padding="10")
+        main_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
+        
+        # URL Entry
+        ttk.Label(main_frame, text="Enter URL to shorten:").grid(row=0, column=0, sticky=tk.W, pady=5)
+        self.url_entry = ttk.Entry(main_frame, width=50)
+        self.url_entry.grid(row=1, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=5)
+        
+        # Service Selection
+        ttk.Label(main_frame, text="Select URL shortener service:").grid(row=2, column=0, sticky=tk.W, pady=5)
+        self.service_var = tk.StringVar(value="tinyurl")
+        services = ["tinyurl", "bitly", "isgd", "chilpit", "clckru"]
+        service_combo = ttk.Combobox(main_frame, textvariable=self.service_var, values=services, state="readonly")
+        service_combo.grid(row=3, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=5)
+        
+        # Shorten Button
+        ttk.Button(main_frame, text="Shorten URL", command=self.shorten_url).grid(row=4, column=0, pady=10)
+        
+        # Result Frame
+        result_frame = ttk.LabelFrame(main_frame, text="Shortened URL", padding="5")
+        result_frame.grid(row=5, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=5)
+        
+        self.result_label = ttk.Label(result_frame, text="")
+        self.result_label.grid(row=0, column=0, sticky=tk.W)
+        
+        # Copy Button
+        ttk.Button(result_frame, text="Copy", command=self.copy_url).grid(row=0, column=1, padx=5)
+        
+        # Open Button
+        ttk.Button(result_frame, text="Open", command=self.open_url).grid(row=0, column=2, padx=5)
+        
+        # History Frame
+        history_frame = ttk.LabelFrame(main_frame, text="History", padding="5")
+        history_frame.grid(row=6, column=0, columnspan=2, sticky=(tk.W, tk.E, tk.N, tk.S), pady=5)
+        
+        # History Listbox
+        self.history_listbox = tk.Listbox(history_frame, height=5, width=50)
+        self.history_listbox.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
+        
+        # Scrollbar for history
+        scrollbar = ttk.Scrollbar(history_frame, orient=tk.VERTICAL, command=self.history_listbox.yview)
+        scrollbar.grid(row=0, column=1, sticky=(tk.N, tk.S))
+        self.history_listbox.configure(yscrollcommand=scrollbar.set)
+        
+        # Update history display
+        self.update_history_display()
+        
+    def shorten_url(self):
+        """Shorten the entered URL"""
+        url = self.url_entry.get().strip()
+        if not url:
+            messagebox.showerror("Error", "Please enter a URL")
+            return
+        
+        try:
+            # Select the appropriate shortener service
+            service = self.service_var.get()
+            if service == "tinyurl":
+                shortened_url = self.shortener.tinyurl.short(url)
+            elif service == "bitly":
+                shortened_url = self.shortener.bitly.short(url)
+            elif service == "isgd":
+                shortened_url = self.shortener.isgd.short(url)
+            elif service == "chilpit":
+                shortened_url = self.shortener.chilpit.short(url)
+            elif service == "clckru":
+                shortened_url = self.shortener.clckru.short(url)
+            else:
+                raise Exception("Unknown service selected.")
+            
+            # Update result label
+            self.result_label.config(text=shortened_url)
+            
+            # Add to history
+            self.history.append({
+                'original_url': url,
+                'shortened_url': shortened_url,
+                'service': service,
+                'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            })
+            
+            # Save history
+            self.save_history()
+            
+            # Update history display
+            self.update_history_display()
+            
+            messagebox.showinfo("Success", "URL shortened successfully!")
+            
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to shorten URL: {str(e)}")
+    
+    def copy_url(self):
+        """Copy shortened URL to clipboard"""
+        shortened_url = self.result_label.cget("text")
+        if shortened_url:
+            pyperclip.copy(shortened_url)
+            messagebox.showinfo("Success", "URL copied to clipboard!")
+        else:
+            messagebox.showerror("Error", "No URL to copy")
+    
+    def open_url(self):
+        """Open shortened URL in default browser"""
+        shortened_url = self.result_label.cget("text")
+        if shortened_url:
+            webbrowser.open(shortened_url)
+        else:
+            messagebox.showerror("Error", "No URL to open")
+    
+    def update_history_display(self):
+        """Update the history listbox display"""
+        self.history_listbox.delete(0, tk.END)
+        for entry in reversed(self.history):
+            display_text = f"{entry['timestamp']} - {entry['shortened_url']}"
+            self.history_listbox.insert(tk.END, display_text)
+    
+    def run(self):
+        """Run the application"""
+        self.window.mainloop()
+
+def main():
+    # Install required packages if not already installed
+    try:
+        import pyshorteners
+        import pyperclip
+    except ImportError:
+        print("Installing required packages...")
+        import subprocess
+        subprocess.check_call(["pip", "install", "pyshorteners", "pyperclip"])
+    
+    # Create and run the URL shortener
+    app = URLShortener()
+    app.run()
+
+if __name__ == "__main__":
+    main()

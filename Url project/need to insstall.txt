@@ -1,0 +1,10 @@
+----need to install modules
+
+import pyshorteners
+import tkinter as tk
+from tkinter import ttk, messagebox
+import pyperclip
+import webbrowser
+import json
+import os
+from datetime import datetime
